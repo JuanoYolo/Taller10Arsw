@@ -17,6 +17,9 @@ import javax.websocket.OnMessage;
 import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
+
+import co.edu.escuelaing.interactivebalckboardlife.BBApplicationContextAware;
+import co.edu.escuelaing.interactivebalckboardlife.TicketRepository;
 import org.springframework.stereotype.Component;
 
 
@@ -29,6 +32,10 @@ public class BBEndpoint {
     /* Queue for all open WebSocket sessions */
     static Queue<Session> queue = new ConcurrentLinkedQueue<>();
 
+    private boolean accepted = false;
+
+    //This code allows to include a bean directly from the application context
+    TicketRepository ticketRepo = (TicketRepository) BBApplicationContextAware.getApplicationContext().getBean("ticketRepository");
     Session ownSession = null;
 
     /* Call this method to send a message to all clients */
@@ -48,8 +55,19 @@ public class BBEndpoint {
 
     @OnMessage
     public void processPoint(String message, Session session) {
-        logger.log(Level.INFO, "Point received:" + message + ". From session: " + session);
-        this.send(message);
+        if (accepted) {
+            this.send(message);
+        } else {
+            if (!accepted && ticketRepo.checkTicket(message)) {
+                accepted = true;
+            }else{
+                try {
+                    ownSession.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(BBEndpoint.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
     }
 
     @OnOpen
